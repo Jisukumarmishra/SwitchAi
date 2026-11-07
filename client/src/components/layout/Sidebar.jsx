@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard,
+  MessageSquare,
   AlertTriangle,
   Bot,
-  MessageSquare,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -12,10 +11,9 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/incidents', icon: AlertTriangle, label: 'Incidents' },
+  { to: '/', icon: MessageSquare, label: 'Team Chat' },
+  { to: '/incidents', icon: AlertTriangle, label: 'Bug Reports' },
   { to: '/agents', icon: Bot, label: 'AI Agents' },
-  { to: '/room', icon: MessageSquare, label: 'Team Room' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 

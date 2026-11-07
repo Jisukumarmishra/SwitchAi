@@ -34,6 +34,10 @@ class MockAIProvider {
   /*  Triage mock                                                        */
   /* ================================================================== */
   _triageResponse(incident) {
+    if (this._isMissingUserResponseBug(incident)) {
+      return this._missingUserTriageResponse(incident);
+    }
+
     return {
       classification: {
         type: 'deployment',
@@ -98,7 +102,11 @@ class MockAIProvider {
   /* ================================================================== */
   /*  Investigation mock                                                 */
   /* ================================================================== */
-  _investigationResponse(_incident) {
+  _investigationResponse(incident) {
+    if (this._isMissingUserResponseBug(incident)) {
+      return this._missingUserInvestigationResponse(incident);
+    }
+
     return {
       logAnalysis: {
         totalEntriesAnalyzed: 24817,
@@ -201,7 +209,11 @@ class MockAIProvider {
   /* ================================================================== */
   /*  Fix & Release mock                                                 */
   /* ================================================================== */
-  _fixResponse(_incident) {
+  _fixResponse(incident) {
+    if (this._isMissingUserResponseBug(incident)) {
+      return this._missingUserFixResponse(incident);
+    }
+
     return {
       remediationPlan: {
         summary:
@@ -293,6 +305,104 @@ class MockAIProvider {
         'Proceed with the hotfix deployment (v2.14.1) via canary. The root cause is well understood ' +
         'and the fix is minimal (single null-check restoration). Risk is mitigated by canary gating ' +
         'and a pre-tested rollback plan. Estimated full recovery within 90 minutes.',
+    };
+  }
+
+  _isMissingUserResponseBug(incident) {
+    const report = [incident.title, incident.description, ...(incident.logs || [])]
+      .filter(Boolean)
+      .join('\n')
+      .toLowerCase();
+    return /\/api\/users?\//.test(report) && /500/.test(report) && /404/.test(report);
+  }
+
+  _missingUserTriageResponse(incident) {
+    const severity = incident.severity || 'medium';
+    const service = incident.affectedService || 'user API';
+    const priority = severity === 'critical' ? 'P0' : severity === 'high' ? 'P1' : 'P2';
+    return {
+      classification: {
+        type: 'application bug',
+        subtype: 'missing-resource HTTP status handling',
+        confidence: 0.88,
+        reasoning: 'The report says a missing user produces HTTP 500 while HTTP 404 is expected. No repository or runtime trace was provided, so the code path still needs inspection.',
+      },
+      severityAssessment: {
+        current: severity,
+        recommended: severity,
+        reasoning: 'Severity follows the submitted report; traffic volume and customer impact metrics were not provided.',
+        impactScore: severity === 'critical' ? 9 : severity === 'high' ? 7 : 4,
+      },
+      affectedServices: [{ name: service, status: 'reported failure', errorRate: 'not provided' }],
+      priority: {
+        level: priority,
+        reasoning: 'The request fails for missing users. The report does not include enough impact data to claim a production-wide outage.',
+      },
+      recommendations: [
+        'Inspect the user lookup and exception-to-HTTP mapping for GET /api/users/:id',
+        'Add regression coverage for both an existing user (200) and a missing user (404)',
+        'Keep any proposed source change on a separate branch for human review',
+      ],
+    };
+  }
+
+  _missingUserInvestigationResponse(incident) {
+    const logs = Array.isArray(incident.logs) ? incident.logs : [];
+    const errors = logs.filter((line) => /error|exception|fatal/i.test(line));
+    const warnings = logs.filter((line) => /warn/i.test(line));
+    const pattern = errors[0];
+    return {
+      logAnalysis: {
+        totalEntriesAnalyzed: logs.length,
+        timeRange: null,
+        errorCount: errors.length,
+        warningCount: warnings.length,
+        summary: logs.length
+          ? `Reviewed ${logs.length} supplied log line(s). ${errors.length} matched an error pattern. These samples do not identify a verified source-code cause.`
+          : 'No application logs were attached, so log-based error detection could not be performed.',
+      },
+      errorPatterns: pattern ? [{ pattern, frequency: errors.filter((line) => line === pattern).length }] : [],
+      deploymentCorrelation: {
+        deploymentId: null,
+        version: null,
+        deployedAt: null,
+        correlationStrength: 'not provided',
+        suspiciousCommits: [],
+      },
+      rootCauses: [{
+        id: 'HYP-001',
+        description: 'Hypothesis only: the missing-user result may raise an unhandled exception instead of being mapped to HTTP 404. Confirm this by inspecting the endpoint and service code.',
+        confidence: 0.55,
+        evidence: [
+          'The report states that a missing user returns HTTP 500 and expects HTTP 404.',
+          ...(logs.length ? [`${logs.length} log line(s) were supplied; they have not been matched to repository source.`] : ['No log samples or repository source were supplied.']),
+        ],
+      }],
+      evidence: { logSnippets: logs, metrics: {} },
+    };
+  }
+
+  _missingUserFixResponse(incident) {
+    return {
+      remediationPlan: {
+        summary: 'Proposed next step: inspect the user lookup and map a missing record to HTTP 404, then cover the behavior with regression tests. No source files were inspected or changed by this local demo.',
+        steps: [
+          { order: 1, action: 'Inspect the GET /api/users/:id handler and not-found path', assignee: 'Developer', estimatedMinutes: 15, details: 'Verify where the missing-user case becomes an exception.' },
+          { order: 2, action: 'Add tests for existing user → 200 and missing user → 404', assignee: 'Developer', estimatedMinutes: 15, details: 'Use the project test framework and keep the missing-user case as a regression test.' },
+          { order: 3, action: 'Propose the smallest fix on a separate branch for review', assignee: 'Developer', estimatedMinutes: 20, details: 'The local demo does not edit files, run repository tests, or create a pull request.' },
+        ],
+      },
+      rollbackPlan: {
+        trigger: 'A proposed code change fails tests or review identifies a regression.',
+        steps: [{ order: 1, action: 'Revert the proposed branch or pull request after human review; no production action is run by this demo.', estimatedMinutes: 5 }],
+      },
+      riskAssessment: {
+        level: 'medium',
+        factors: ['The code path and error handling have not been inspected.', 'The report contains no test output or deployment evidence.'],
+        mitigations: ['Confirm the source-level cause before changing code.', 'Run regression tests and require human review before merge.'],
+      },
+      estimatedRecoveryTime: 'Not estimated — source code and test results are unavailable',
+      recommendation: 'Treat this as an investigation plan only. Verify the missing-user path in the repository, implement and test a fix on a branch, then request human review.',
     };
   }
 }

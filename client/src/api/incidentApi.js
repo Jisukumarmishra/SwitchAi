@@ -27,9 +27,9 @@ export async function createIncident(data) {
   return handleResponse(res);
 }
 
-export function runWorkflow(id) {
-  const eventSource = new EventSource(`${API_BASE}/incidents/${id}/run-workflow`);
-  return eventSource;
+export async function getIncidentReport(id) {
+  const res = await fetch(`${API_BASE}/incidents/${id}/report`);
+  return handleResponse(res);
 }
 
 export async function approveIncident(id, data) {

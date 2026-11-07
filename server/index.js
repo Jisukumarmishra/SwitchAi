@@ -23,7 +23,9 @@ async function start() {
   const repository = getRepository(config.DATA_MODE);
   const incidentService = new IncidentService(repository);
   const aiProvider = getProvider(config.AI_PROVIDER);
-  const orchestrator = new AgentOrchestrator(incidentService, aiProvider);
+  const { getSwitchAdapter } = require('./integrations/switch/switchFactory');
+  const switchAdapter = getSwitchAdapter();
+  const orchestrator = new AgentOrchestrator(incidentService, aiProvider, switchAdapter);
 
   // Mount routes
   app.use('/api', healthRoutes);

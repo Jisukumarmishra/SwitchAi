@@ -11,7 +11,8 @@ export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/" element={<TeamRoomPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/incidents" element={<IncidentsPage />} />
         <Route path="/incidents/:id" element={<IncidentWorkspacePage />} />
         <Route path="/agents" element={<AgentsPage />} />

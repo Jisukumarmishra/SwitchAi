@@ -14,14 +14,19 @@ class AgentOrchestrator extends EventEmitter {
    * @param {import('./incidentService')} incidentService
    * @param {import('../providers/mockAIProvider')} aiProvider
    */
-  constructor(incidentService, aiProvider) {
+  constructor(incidentService, aiProvider, switchAdapter) {
     super();
     this.incidentService = incidentService;
     this.aiProvider = aiProvider;
+    this.switchAdapter = switchAdapter;
+    this.roomId = 'switchai-incident-room';
 
     this.triageAgent = new TriageAgent(aiProvider);
     this.investigationAgent = new InvestigationAgent(aiProvider);
     this.fixReleaseAgent = new FixReleaseAgent(aiProvider);
+    
+    // Initialize switch room
+    this._initSwitch();
   }
 
   /**
@@ -33,6 +38,21 @@ class AgentOrchestrator extends EventEmitter {
       this.investigationAgent.toJSON(),
       this.fixReleaseAgent.toJSON(),
     ];
+  }
+
+  /**
+   * Prepare the in-process demo room without claiming a live Switch connection.
+   * The protocol adapter remains a scaffold until its real API is implemented.
+   */
+  _initSwitch() {
+    if (!this.switchAdapter || this.switchAdapter.constructor.name !== 'LocalDemoAdapter') return;
+
+    this.switchAdapter
+      .joinRoom(this.roomId)
+      .then(() => Promise.all(this.getAgents().map((agent) => this.switchAdapter.registerAgent(agent))))
+      .catch((err) => {
+        console.error('Local demo room initialization failed:', err.message);
+      });
   }
 
   /**
